@@ -1,6 +1,10 @@
 
 # twclone
 
+> **Maintained fork.** This is [jasonfen/twclone](https://github.com/jasonfen/twclone), a continuation of
+> [rdearman/twclone](https://github.com/rdearman/twclone), which has been quiet since early 2026. Bug reports and
+> PRs are welcome here; fixes are offered back upstream (e.g. rdearman/twclone#487). Licence and credits are unchanged.
+
 A modern, C-based recreation of classic BBS-era space-trading gameplay (in the spirit of TradeWars 2002). **twclone** provides a headless server, a terminal client, and a deterministic “Big Bang” universe generator—now backed by **PostgreSQL** (with support for MySQL and other database engines) with a **JSON** protocol that makes writing clients (or AI bots) straightforward.
 
 > **What’s new (2025):**
@@ -42,9 +46,10 @@ If you’re here from SourceForge: welcome back! The original code (largely GPL-
 
 ```
 twclone/
-├─ bin/                 # Built artefacts: server, client, test_bang
+├─ bin/                 # Built artefacts: server, bigbang
+├─ client/              # Python terminal client (client.py) and menus.json
 ├─ src/                 # C sources (server_loop.c, engine/*.c, …)
-├─ data/                # menus.json and other runtime data
+├─ sql/pg/              # Schema and stored procedures applied by bigbang
 ├─ docs/                # ENGINE.md, PROTOCOL.md, SYSOP.md, design notes
 ├─ Makefile.am …        # Autotools build files
 └─ README.md            # This file
@@ -56,22 +61,23 @@ twclone/
 
 ```bash
 # 1) Build
+autoreconf -fi && ./configure
 make clean && make -j
 
-# 2) Configure PostgreSQL (or MySQL/other DB)
+# 2) Configure PostgreSQL: a database-creating role the tools can reach.
 # See docs/PGBOUNCER_DEPLOYMENT.md for production pooling setup
 
-# 3) Build the Universe
-    ./bin/bigbang.json 
-    a) (copy the sample.bigbang.json to bigbang.json and edit the file to show your db connection string, your desired universe size, etc.)
-    ./bigbang
-    b) run executable which will read the bigbang.json file and create your universe
+# 3) Build the universe: copy bigbang.json.sample to bigbang.json, edit the
+#    connection strings and universe size, then run bigbang from the repo root
+#    (it reads ./bigbang.json and applies ./sql/pg).
+cp bigbang.json.sample bigbang.json
+./bin/bigbang
 
-# 4) Start the server
-./server
+# 4) Start the server (also run from the repo root; it reads bigbang.json to find the DB)
+./bin/server --host 0.0.0.0 --port 1234
 
-# 5) Connect with the client (renders from menus.json)
-./bin/client --host localhost --port 1234 --menus ./data/menus.json
+# 5) Connect with the client (Python 3; reads client/menus.json by default)
+python3 client/client.py --host localhost --port 1234
 
 ```
 
@@ -81,10 +87,19 @@ make clean && make -j
 
 ## Build from source
 
-**Prereqs:** GCC/Clang, GNU make, PostgreSQL dev libraries (or MySQL), POSIX (Linux/WSL/macOS).
+**Prereqs:** GCC, GNU make, autoconf/automake/libtool, and dev headers for libpq, jansson, readline, OpenSSL, libuuid and MariaDB/MySQL client (the MySQL driver is always compiled). On Debian/Ubuntu:
+
+```bash
+sudo apt install build-essential autoconf automake libtool pkg-config \
+  libpq-dev libjansson-dev libreadline-dev libssl-dev uuid-dev libmariadb-dev
+```
+
+Linux/WSL is the tested platform. macOS/clang currently fails to build (see jasonfen/twclone#4).
+
 **Build:**
 
 ```bash
+autoreconf -fi && ./configure
 make clean && make -j
 # Artefacts land in ./bin
 ```
@@ -105,6 +120,9 @@ make V=1
 
 * `--host <addr>` (default `0.0.0.0`)
 * `--port <port>` (default `1234`)
+* Run from the repo root: the server reads `bigbang.json` (or `bin/bigbang.json`) for the DB connection.
+* The engine reads `server_port` and `s2s_port` from the `config` table, which bigbang fills from `bigbang.json`. If they are missing the engine tries port 0 and the server exits with `accept failed`.
+* The server opens a sysop console on stdin. When backgrounding it, redirect stdin: `./bin/server ... </dev/null &`.
 
 Typical logs:
 
@@ -118,13 +136,13 @@ server: listening on 0.0.0.0:1234
 
 ## Running the client
 
-A simple terminal client is included for testing. You can also write your own in any language that speaks JSON.
+A simple Python terminal client is included for testing (`client/client.py`, Python 3, standard library only). You can also write your own in any language that speaks JSON.
 
 ```bash
-./bin/client --host localhost --port 1234 --menus ./data/menus.json
+python3 client/client.py --host localhost --port 1234 [--user NAME --passwd PW] [--debug]
 ```
 
-If you place `menus.json` at `./data/menus.json`, you can usually just run `./bin/client`.
+Menus are read from `client/menus.json` by default; override with `--menus <path>`.
 
 ---
 
@@ -192,8 +210,8 @@ All client↔server interactions use JSON. The engine↔server (S2S) control cha
 
 * **Engine:** PostgreSQL (primary), with MySQL and other database support.
 * **Scaling:** 100+ concurrent connections out-of-box; unlimited via **[PgBouncer connection pooling](./docs/PGBOUNCER_DEPLOYMENT.md)**.
-* **Schema:** created/verified at first run (or by `test_bang`).
-* **Reset:** drop and recreate the database, then re-run `test_bang` (or start the server to re-seed essentials).
+* **Schema:** created by `bigbang` from `sql/pg/*.sql` (applied in numeric-prefix order).
+* **Reset:** re-run `./bin/bigbang`; it asks for confirmation before destroying an existing universe.
 
 Handy CLI (PostgreSQL):
 
@@ -243,9 +261,9 @@ For deep technical detail and task breakdowns, see **ENGINE.md** and GitHub Issu
 
    ```bash
    make clean && make -j
-   ./bin/test_bang
+   ./bin/bigbang
    ./bin/server --host 0.0.0.0 --port 1234
-   ./bin/client --host localhost --port 1234 --menus ./data/menus.json
+   python3 client/client.py --host localhost --port 1234
    ```
 5. Include tests or a reproducible scenario where it makes sense.
 
