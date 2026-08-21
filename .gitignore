@@ -78,3 +78,6 @@ ai_player/bugs
 temp_parser_test.err
 temp_parser_test.py
 .aider*
+
+# Claude Code instructions (kept local)
+CLAUDE.md
