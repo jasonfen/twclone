@@ -1,9 +1,9 @@
 
 # twclone
 
-> **Maintained fork.** This is [jasonfen/twclone](https://github.com/jasonfen/twclone), a continuation of
-> [rdearman/twclone](https://github.com/rdearman/twclone), which has been quiet since early 2026. Bug reports and
-> PRs are welcome here; fixes are offered back upstream (e.g. rdearman/twclone#487). Licence and credits are unchanged.
+> **Fork.** This is [jasonfen/twclone](https://github.com/jasonfen/twclone), a fork of
+> [rdearman/twclone](https://github.com/rdearman/twclone), which remains the upstream project. Fixes made
+> here are offered back upstream (e.g. rdearman/twclone#487). Licence and credits are unchanged.
 
 A modern, C-based recreation of classic BBS-era space-trading gameplay (in the spirit of TradeWars 2002). **twclone** provides a headless server, a terminal client, and a deterministic “Big Bang” universe generator—now backed by **PostgreSQL** (with support for MySQL and other database engines) with a **JSON** protocol that makes writing clients (or AI bots) straightforward.
 
